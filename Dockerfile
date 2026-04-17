@@ -4,36 +4,42 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-ENV PORT 10000
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
-# Install system dependencies for OpenCV and curl for downloading model
+# Create a user to match Hugging Face's requirements
+RUN useradd -m -u 1000 user
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for OpenCV and curl
 RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and set working directory
-WORKDIR /app
-
 # Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Create Model directory
-RUN mkdir -p Model
+# Create Model directory and set permissions
+RUN mkdir -p Model && chown -R user:user /app
 
-# PRE-DOWNLOAD THE MODEL (This makes startup instant on Render!)
-# We download during build so the app is ready immediately
+# Switch to the non-root user
+USER user
+
+# PRE-DOWNLOAD THE MODEL (This makes startup instant!)
 RUN curl -L -o Model/colorization_deploy_v2.prototxt https://storage.openvinotoolkit.org/repositories/datumaro/models/colorization/colorization_deploy_v2.prototxt && \
     curl -L -o Model/colorization_release_v2.caffemodel https://storage.openvinotoolkit.org/repositories/datumaro/models/colorization/colorization_release_v2.caffemodel && \
     curl -L -o Model/pts_in_hull.npy https://storage.openvinotoolkit.org/repositories/datumaro/models/colorization/pts_in_hull.npy
 
 # Copy the rest of the application code
-COPY . .
+COPY --chown=user . .
 
-# Expose the port
-EXPOSE 10000
+# Expose the Hugging Face standard port
+EXPOSE 7860
 
-# Start the application using Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app", "--timeout", "120"]
+# Start the application using Gunicorn on port 7860
+CMD ["gunicorn", "--bind", "0.0.0.0:7860", "app:app", "--timeout", "120"]

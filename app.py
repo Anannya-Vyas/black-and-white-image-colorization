@@ -62,6 +62,6 @@ if __name__ == '__main__':
     colorizer.ensure_models()
     
     # Use environment variable for port (required for cloud deployment)
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 7860))
     print(f"Starting server on port {port}...")
     app.run(host='0.0.0.0', port=port)
